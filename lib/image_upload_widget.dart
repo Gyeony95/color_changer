@@ -56,6 +56,7 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
 
       setState(() {
         _colors = colors.toList();
+        _modifiedSvgString = _svgDocument!.toXmlString(pretty: true);
       });
     }
   }
@@ -63,7 +64,7 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
   void _changeSvgColor(Color targetColor, Color newColor) {
     if (_svgDocument == null) return;
 
-    final targetHex = _colorToHex(targetColor);
+    final targetHex = _colorToHex(targetColor).toLowerCase();
     final newHex = _colorToHex(newColor);
 
     for (final element in _svgDocument!.findAllElements('*')) {
@@ -290,11 +291,15 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
 
   Widget _buildImageDisplay() {
     return _isSvg
-        ? SvgPicture.file(
-            _uploadedImage!,
-            height: 200,
-            width: 200,
-          )
+        ? (_modifiedSvgString != null && _modifiedSvgString!.isNotEmpty
+            ? SvgPicture.string(
+                _modifiedSvgString!,
+                height: 200,
+                width: 200,
+              )
+            : Container(
+                child: const Text('Invalid SVG Data'),
+              ))
         : _modifiedImage != null
             ? Material(
                 elevation: 4,
