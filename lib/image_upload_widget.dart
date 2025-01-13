@@ -27,12 +27,15 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
   List<Color> _gradientColors = [];
   img.Image? _originalImage;
   img.Image? _modifiedImage;
+  img.Image? _backupImage;
   bool _isSvg = false;
   XmlDocument? _svgDocument;
   String? _modifiedSvgString;
 
   Color startColor = Colors.transparent;
   Color endColor = Colors.transparent;
+  Color originalStartColor = Colors.transparent;
+  Color originalEndColor = Colors.transparent;
   bool hasGradient = false;
   String gradientDirection = 'vertical';
 
@@ -46,6 +49,10 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
     } else {
       await _extractColors();
       await processGradientAndApply(path);
+      _detectGradientDirection();
+      _backupImage = _originalImage!.clone();
+      originalStartColor = startColor;
+      originalEndColor = endColor;
     }
     setState(() {});
   }
@@ -296,6 +303,208 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
         (a.blue - b.blue).abs() < 255 * tolerance;
   }
 
+  void _detectGradientDirection() {
+    if (_originalImage == null) return;
+
+    final int width = _originalImage!.width;
+    final int height = _originalImage!.height;
+
+    int verticalChange = 0;
+    int horizontalChange = 0;
+    int diagonalChange = 0;
+
+    for (int y = 0; y < height - 1; y++) {
+      for (int x = 0; x < width - 1; x++) {
+        int currentPixel = _originalImage!.getPixel(x, y);
+        int nextVerticalPixel = _originalImage!.getPixel(x, y + 1);
+        int nextHorizontalPixel = _originalImage!.getPixel(x + 1, y);
+        int nextDiagonalPixel = _originalImage!.getPixel(x + 1, y + 1);
+
+        verticalChange += _colorDifference(currentPixel, nextVerticalPixel);
+        horizontalChange += _colorDifference(currentPixel, nextHorizontalPixel);
+        diagonalChange += _colorDifference(currentPixel, nextDiagonalPixel);
+      }
+    }
+
+    setState(() {
+      hasGradient = true;
+      if (verticalChange > horizontalChange && verticalChange > diagonalChange) {
+        gradientDirection = 'vertical';
+      } else if (horizontalChange > verticalChange && horizontalChange > diagonalChange) {
+        gradientDirection = 'horizontal';
+      } else {
+        gradientDirection = 'diagonal';
+      }
+    });
+  }
+
+  int _colorDifference(int pixel1, int pixel2) {
+    int rDiff = (img.getRed(pixel1) - img.getRed(pixel2)).abs();
+    int gDiff = (img.getGreen(pixel1) - img.getGreen(pixel2)).abs();
+    int bDiff = (img.getBlue(pixel1) - img.getBlue(pixel2)).abs();
+    return rDiff + gDiff + bDiff;
+  }
+
+  void _applyGradient() {
+    if (_originalImage == null || !hasGradient) return;
+
+    img.Image tempImage = img.copyResize(
+      _modifiedImage ?? _originalImage!,
+      width: _originalImage!.width,
+      height: _originalImage!.height,
+    );
+
+    for (int y = 0; y < tempImage.height; y++) {
+      for (int x = 0; x < tempImage.width; x++) {
+        double t;
+        if (gradientDirection == 'vertical') {
+          t = y / tempImage.height;
+        } else { // horizontal
+          t = x / tempImage.width;
+        }
+
+        int r = (startColor.red * (1 - t) + endColor.red * t).toInt();
+        int g = (startColor.green * (1 - t) + endColor.green * t).toInt();
+        int b = (startColor.blue * (1 - t) + endColor.blue * t).toInt();
+
+        Color newColor = Color.fromARGB(255, r, g, b);
+        int pixel = tempImage.getPixel(x, y);
+        Color pixelColor = Color.fromARGB(
+          img.getAlpha(pixel),
+          img.getRed(pixel),
+          img.getGreen(pixel),
+          img.getBlue(pixel),
+        );
+
+        if (_isColorSimilar(pixelColor, startColor) || _isColorSimilar(pixelColor, endColor)) {
+          tempImage.setPixel(x, y, img.getColor(r, g, b));
+        }
+      }
+    }
+
+    setState(() {
+      _modifiedImage = tempImage;
+    });
+  }
+
+  Widget _buildGradientEditor() {
+    if (!hasGradient) return Container(); // 그라데이션이 없으면 빈 컨테이너 반환
+
+    return Column(
+      children: [
+        const Text('Gradient Start Color'),
+        _buildColorPicker2(startColor, (newColor) {
+          setState(() {
+            startColor = newColor;
+            _applyGradient();
+          });
+        }),
+        const Text('Gradient End Color'),
+        _buildColorPicker2(endColor, (newColor) {
+          setState(() {
+            endColor = newColor;
+            _applyGradient();
+          });
+        }),
+      ],
+    );
+  }
+
+  Widget _buildColorPicker2(Color color, ValueChanged<Color> onColorChanged) {
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) {
+            Color newColor = color;
+            return AlertDialog(
+              title: const Text('Pick a color'),
+              content: SingleChildScrollView(
+                child: ColorPicker(
+                  pickerColor: color,
+                  onColorChanged: (selectedColor) {
+                    newColor = selectedColor;
+                  },
+                ),
+              ),
+              actions: <Widget>[
+                ElevatedButton(
+                  child: const Text('Select'),
+                  onPressed: () {
+                    onColorChanged(newColor);
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+      child: Container(
+        width: 50,
+        height: 50,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.black26),
+        ),
+      ),
+    );
+  }
+
+  void _resetImage() {
+    setState(() {
+      _modifiedImage = _backupImage!.clone();
+      _colors = _gradientColors;
+      startColor = originalStartColor;
+      endColor = originalEndColor;
+    });
+  }
+
+  void _changeGradientColor(Color targetColor, Color newColor) {
+    if (_originalImage == null) return;
+
+    img.Image tempImage = img.copyResize(
+      _modifiedImage ?? _originalImage!,
+      width: _originalImage!.width,
+      height: _originalImage!.height,
+    );
+
+    for (int y = 0; y < tempImage.height; y++) {
+      for (int x = 0; x < tempImage.width; x++) {
+        int pixel = tempImage.getPixel(x, y);
+        Color pixelColor = Color.fromARGB(
+          img.getAlpha(pixel),
+          img.getRed(pixel),
+          img.getGreen(pixel),
+          img.getBlue(pixel),
+        );
+
+        if (_isColorSimilar(pixelColor, targetColor)) {
+          tempImage.setPixel(
+            x,
+            y,
+            img.getColor(
+              newColor.red,
+              newColor.green,
+              newColor.blue,
+              newColor.alpha,
+            ),
+          );
+        }
+      }
+    }
+
+    setState(() {
+      _modifiedImage = tempImage;
+      int index = _gradientColors.indexOf(targetColor);
+      if (index != -1) {
+        _gradientColors[index] = newColor;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -316,6 +525,11 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
             ElevatedButton(
               onPressed: _downloadModifiedImage,
               child: const Text('Download Modified Image'),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: _resetImage,
+              child: const Text('Reset Image'),
             ),
           ],
         ),
@@ -516,161 +730,5 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
         ),
       ),
     );
-  }
-
-  void _changeGradientColor(Color targetColor, Color newColor) {
-    if (_originalImage == null) return;
-
-    img.Image tempImage = img.copyResize(
-      _modifiedImage ?? _originalImage!,
-      width: _originalImage!.width,
-      height: _originalImage!.height,
-    );
-
-    for (int y = 0; y < tempImage.height; y++) {
-      for (int x = 0; x < tempImage.width; x++) {
-        int pixel = tempImage.getPixel(x, y);
-        Color pixelColor = Color.fromARGB(
-          img.getAlpha(pixel),
-          img.getRed(pixel),
-          img.getGreen(pixel),
-          img.getBlue(pixel),
-        );
-
-        if (_isColorSimilar(pixelColor, targetColor)) {
-          tempImage.setPixel(
-            x,
-            y,
-            img.getColor(
-              newColor.red,
-              newColor.green,
-              newColor.blue,
-              newColor.alpha,
-            ),
-          );
-        }
-      }
-    }
-
-    setState(() {
-      _modifiedImage = tempImage;
-      int index = _gradientColors.indexOf(targetColor);
-      if (index != -1) {
-        _gradientColors[index] = newColor;
-      }
-    });
-  }
-
-  Widget _buildGradientEditor() {
-    return Column(
-      children: [
-        const Text('Gradient Start Color'),
-        _buildColorPicker2(startColor, (newColor) {
-          setState(() {
-            startColor = newColor;
-            _applyGradient();
-          });
-        }),
-        const Text('Gradient End Color'),
-        _buildColorPicker2(endColor, (newColor) {
-          setState(() {
-            endColor = newColor;
-            _applyGradient();
-          });
-        }),
-        const Text('Gradient Direction'),
-        DropdownButton<String>(
-          value: gradientDirection,
-          items: <String>['vertical', 'horizontal', 'diagonal'].map((String value) {
-            return DropdownMenuItem<String>(
-              value: value,
-              child: Text(value),
-            );
-          }).toList(),
-          onChanged: (String? newValue) {
-            setState(() {
-              gradientDirection = newValue!;
-              _applyGradient();
-            });
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildColorPicker2(Color color, ValueChanged<Color> onColorChanged) {
-    return GestureDetector(
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (context) {
-            Color newColor = color;
-            return AlertDialog(
-              title: const Text('Pick a color'),
-              content: SingleChildScrollView(
-                child: ColorPicker(
-                  pickerColor: color,
-                  onColorChanged: (selectedColor) {
-                    newColor = selectedColor;
-                  },
-                ),
-              ),
-              actions: <Widget>[
-                ElevatedButton(
-                  child: const Text('Select'),
-                  onPressed: () {
-                    onColorChanged(newColor);
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
-      child: Container(
-        width: 50,
-        height: 50,
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.black26),
-        ),
-      ),
-    );
-  }
-
-  void _applyGradient() {
-    if (_originalImage == null) return;
-
-    img.Image tempImage = img.copyResize(
-      _modifiedImage ?? _originalImage!,
-      width: _originalImage!.width,
-      height: _originalImage!.height,
-    );
-
-    for (int y = 0; y < tempImage.height; y++) {
-      for (int x = 0; x < tempImage.width; x++) {
-        double t;
-        if (gradientDirection == 'vertical') {
-          t = y / tempImage.height;
-        } else if (gradientDirection == 'horizontal') {
-          t = x / tempImage.width;
-        } else { // diagonal
-          t = (x + y) / (tempImage.width + tempImage.height);
-        }
-
-        int r = (startColor.red * (1 - t) + endColor.red * t).toInt();
-        int g = (startColor.green * (1 - t) + endColor.green * t).toInt();
-        int b = (startColor.blue * (1 - t) + endColor.blue * t).toInt();
-
-        tempImage.setPixel(x, y, img.getColor(r, g, b));
-      }
-    }
-
-    setState(() {
-      _modifiedImage = tempImage;
-    });
   }
 }
