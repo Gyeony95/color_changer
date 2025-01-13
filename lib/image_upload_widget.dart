@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'dart:typed_data';
@@ -86,9 +87,9 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
     if (_isSvg) {
       if (_modifiedSvgString == null) return;
 
-      final directory = await getApplicationDocumentsDirectory();
-      final filePath = '${directory.path}/modified_image.svg';
-      print(filePath);
+      final filePath = await _selectFilePath('modified_image.svg');
+      if (filePath == null) return;
+
       final file = File(filePath);
       await file.writeAsString(_modifiedSvgString!);
 
@@ -99,8 +100,9 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
     } else {
       if (_modifiedImage == null) return;
 
-      final directory = await getApplicationDocumentsDirectory();
-      final filePath = '${directory.path}/modified_image.png';
+      final filePath = await _selectFilePath('modified_image.png');
+      if (filePath == null) return;
+
       final file = File(filePath);
       await file.writeAsBytes(img.encodePng(_modifiedImage!));
 
@@ -109,6 +111,15 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
         SnackBar(content: Text('이미지 파일이 저장되었습니다: $filePath')),
       );
     }
+  }
+
+  Future<String?> _selectFilePath(String defaultFileName) async {
+    final result = await FilePicker.platform.saveFile(
+      dialogTitle: '파일 저장',
+      fileName: defaultFileName,
+    );
+
+    return result; // 선택된 파일 경로를 반환합니다.
   }
 
   String _colorToHex(Color color) {
