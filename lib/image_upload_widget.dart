@@ -2,7 +2,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter/services.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:image/image.dart' as img;
@@ -22,11 +24,16 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
   File? _uploadedImage;
   bool _dragging = false;
   List<Color> _colors = [];
+  List<Color> _gradientColors = [];
   img.Image? _originalImage;
   img.Image? _modifiedImage;
   bool _isSvg = false;
   XmlDocument? _svgDocument;
   String? _modifiedSvgString;
+
+  Color startColor = Colors.transparent;
+  Color endColor = Colors.transparent;
+  bool hasGradient = false;
 
   void _onImageDropped(String path) async {
     setState(() {
@@ -37,6 +44,7 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
       await _extractColorsFromSvg();
     } else {
       await _extractColors();
+      await processGradientAndApply(path);
     }
     setState(() {});
   }
@@ -54,12 +62,85 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
         }
       }
 
+      for (final gradient in _svgDocument!.findAllElements('linearGradient')) {
+        for (final stop in gradient.findAllElements('stop')) {
+          final stopColor = stop.getAttribute('stop-color');
+          if (stopColor != null && stopColor.startsWith('#')) {
+            colors.add(_hexToColor(stopColor));
+          }
+        }
+      }
+
       setState(() {
         _colors = colors.toList();
         _modifiedSvgString = _svgDocument!.toXmlString(pretty: true);
       });
     }
   }
+
+
+  Future<void> processGradientAndApply(String assetPath) async {
+    // Load the image
+    final ByteData imageData = await rootBundle.load(assetPath);
+    final Uint8List bytes = imageData.buffer.asUint8List();
+
+    // Decode image
+    final ui.Image image = await decodeImageFromList(bytes);
+
+    // Access pixel data
+    final ByteData? pixelData =
+    await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+
+    if (pixelData == null) return;
+
+    final Uint8List pixels = pixelData.buffer.asUint8List();
+
+    const int threshold = 30; // Color difference threshold for detecting gradient
+    int? startPixelIndex;
+    int? endPixelIndex;
+
+    // Image dimensions
+    final int width = image.width;
+    final int height = image.height;
+
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        final int index = (y * width + x) * 4;
+        final int r = pixels[index];
+        final int g = pixels[index + 1];
+        final int b = pixels[index + 2];
+
+        // Detect gradient start
+        startPixelIndex ??= index;
+
+        // Continuously update the end pixel until the last gradient pixel
+        endPixelIndex = index;
+      }
+    }
+
+    if (startPixelIndex != null && endPixelIndex != null) {
+      // Extract start and end colors
+      startColor = Color.fromARGB(
+        255,
+        pixels[startPixelIndex],
+        pixels[startPixelIndex + 1],
+        pixels[startPixelIndex + 2],
+      );
+
+      endColor = Color.fromARGB(
+        255,
+        pixels[endPixelIndex],
+        pixels[endPixelIndex + 1],
+        pixels[endPixelIndex + 2],
+      );
+
+      // Set new gradient colors (example: blue to green)
+      setState(() {
+        hasGradient = true;
+      });
+    }
+  }
+
 
   void _changeSvgColor(Color targetColor, Color newColor) {
     if (_svgDocument == null) return;
@@ -71,6 +152,15 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
       final fill = element.getAttribute('fill');
       if (fill != null && fill.toLowerCase() == targetHex) {
         element.setAttribute('fill', newHex);
+      }
+    }
+
+    for (final gradient in _svgDocument!.findAllElements('linearGradient')) {
+      for (final stop in gradient.findAllElements('stop')) {
+        final stopColor = stop.getAttribute('stop-color');
+        if (stopColor != null && stopColor.toLowerCase() == targetHex) {
+          stop.setAttribute('stop-color', newHex);
+        }
       }
     }
 
@@ -322,9 +412,17 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
-        children: _colors.map((color) {
-          return _buildColorPicker(color);
-        }).toList(),
+        children: [
+          const Text('Colors'),
+          ..._colors.map((color) {
+            return _buildColorPicker(color);
+          }).toList(),
+          const SizedBox(height: 20),
+          const Text('Gradient Colors'),
+          ..._gradientColors.map((color) {
+            return _buildGradientColorPicker(color);
+          }).toList(),
+        ],
       ),
     );
   }
@@ -370,5 +468,91 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
         ),
       ),
     );
+  }
+
+  Widget _buildGradientColorPicker(Color color) {
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) {
+            Color newColor = color;
+            return AlertDialog(
+              title: const Text('Pick a gradient color'),
+              content: SingleChildScrollView(
+                child: ColorPicker(
+                  pickerColor: color,
+                  onColorChanged: (selectedColor) {
+                    newColor = selectedColor;
+                  },
+                ),
+              ),
+              actions: <Widget>[
+                ElevatedButton(
+                  child: const Text('Select'),
+                  onPressed: () {
+                    _changeGradientColor(color, newColor);
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+      child: Container(
+        width: 50,
+        height: 50,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.black26),
+        ),
+      ),
+    );
+  }
+
+  void _changeGradientColor(Color targetColor, Color newColor) {
+    if (_originalImage == null) return;
+
+    img.Image tempImage = img.copyResize(
+      _modifiedImage ?? _originalImage!,
+      width: _originalImage!.width,
+      height: _originalImage!.height,
+    );
+
+    for (int y = 0; y < tempImage.height; y++) {
+      for (int x = 0; x < tempImage.width; x++) {
+        int pixel = tempImage.getPixel(x, y);
+        Color pixelColor = Color.fromARGB(
+          img.getAlpha(pixel),
+          img.getRed(pixel),
+          img.getGreen(pixel),
+          img.getBlue(pixel),
+        );
+
+        if (_isColorSimilar(pixelColor, targetColor)) {
+          tempImage.setPixel(
+            x,
+            y,
+            img.getColor(
+              newColor.red,
+              newColor.green,
+              newColor.blue,
+              newColor.alpha,
+            ),
+          );
+        }
+      }
+    }
+
+    setState(() {
+      _modifiedImage = tempImage;
+      int index = _gradientColors.indexOf(targetColor);
+      if (index != -1) {
+        _gradientColors[index] = newColor;
+      }
+    });
   }
 }
