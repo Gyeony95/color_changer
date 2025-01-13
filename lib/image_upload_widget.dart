@@ -34,6 +34,7 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
   Color startColor = Colors.transparent;
   Color endColor = Colors.transparent;
   bool hasGradient = false;
+  String gradientDirection = 'vertical';
 
   void _onImageDropped(String path) async {
     setState(() {
@@ -81,8 +82,8 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
 
   Future<void> processGradientAndApply(String assetPath) async {
     // Load the image
-    final ByteData imageData = await rootBundle.load(assetPath);
-    final Uint8List bytes = imageData.buffer.asUint8List();
+    final File file = File(assetPath);
+    final Uint8List bytes = await file.readAsBytes();
 
     // Decode image
     final ui.Image image = await decodeImageFromList(bytes);
@@ -577,6 +578,22 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
             _applyGradient();
           });
         }),
+        const Text('Gradient Direction'),
+        DropdownButton<String>(
+          value: gradientDirection,
+          items: <String>['vertical', 'horizontal', 'diagonal'].map((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Text(value),
+            );
+          }).toList(),
+          onChanged: (String? newValue) {
+            setState(() {
+              gradientDirection = newValue!;
+              _applyGradient();
+            });
+          },
+        ),
       ],
     );
   }
@@ -635,7 +652,15 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
 
     for (int y = 0; y < tempImage.height; y++) {
       for (int x = 0; x < tempImage.width; x++) {
-        double t = y / tempImage.height;
+        double t;
+        if (gradientDirection == 'vertical') {
+          t = y / tempImage.height;
+        } else if (gradientDirection == 'horizontal') {
+          t = x / tempImage.width;
+        } else { // diagonal
+          t = (x + y) / (tempImage.width + tempImage.height);
+        }
+
         int r = (startColor.red * (1 - t) + endColor.red * t).toInt();
         int g = (startColor.green * (1 - t) + endColor.green * t).toInt();
         int b = (startColor.blue * (1 - t) + endColor.blue * t).toInt();
