@@ -89,7 +89,7 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
 
     // Access pixel data
     final ByteData? pixelData =
-    await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+        await image.toByteData(format: ui.ImageByteFormat.rawRgba);
 
     if (pixelData == null) return;
 
@@ -330,6 +330,10 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
         _buildDropTarget(),
         const SizedBox(height: 20),
         if (_uploadedImage != null) _buildImageDisplay(),
+        if (hasGradient) ...[
+          const SizedBox(height: 20),
+          _buildGradientEditor(),
+        ],
       ],
     );
   }
@@ -553,6 +557,95 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
       if (index != -1) {
         _gradientColors[index] = newColor;
       }
+    });
+  }
+
+  Widget _buildGradientEditor() {
+    return Column(
+      children: [
+        const Text('Gradient Start Color'),
+        _buildColorPicker2(startColor, (newColor) {
+          setState(() {
+            startColor = newColor;
+            _applyGradient();
+          });
+        }),
+        const Text('Gradient End Color'),
+        _buildColorPicker2(endColor, (newColor) {
+          setState(() {
+            endColor = newColor;
+            _applyGradient();
+          });
+        }),
+      ],
+    );
+  }
+
+  Widget _buildColorPicker2(Color color, ValueChanged<Color> onColorChanged) {
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) {
+            Color newColor = color;
+            return AlertDialog(
+              title: const Text('Pick a color'),
+              content: SingleChildScrollView(
+                child: ColorPicker(
+                  pickerColor: color,
+                  onColorChanged: (selectedColor) {
+                    newColor = selectedColor;
+                  },
+                ),
+              ),
+              actions: <Widget>[
+                ElevatedButton(
+                  child: const Text('Select'),
+                  onPressed: () {
+                    onColorChanged(newColor);
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+      child: Container(
+        width: 50,
+        height: 50,
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.black26),
+        ),
+      ),
+    );
+  }
+
+  void _applyGradient() {
+    if (_originalImage == null) return;
+
+    img.Image tempImage = img.copyResize(
+      _modifiedImage ?? _originalImage!,
+      width: _originalImage!.width,
+      height: _originalImage!.height,
+    );
+
+    for (int y = 0; y < tempImage.height; y++) {
+      for (int x = 0; x < tempImage.width; x++) {
+        double t = y / tempImage.height;
+        int r = (startColor.red * (1 - t) + endColor.red * t).toInt();
+        int g = (startColor.green * (1 - t) + endColor.green * t).toInt();
+        int b = (startColor.blue * (1 - t) + endColor.blue * t).toInt();
+
+        tempImage.setPixel(x, y, img.getColor(r, g, b));
+      }
+    }
+
+    setState(() {
+      _modifiedImage = tempImage;
     });
   }
 }
