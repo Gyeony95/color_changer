@@ -21,42 +21,71 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        DropTarget(
-          onDragEntered: (details) {
-            setState(() {
-              _dragging = true;
-            });
-          },
-          onDragExited: (details) {
-            setState(() {
-              _dragging = false;
-            });
-          },
-          onDragDone: (details) {
-            if (details.files.isNotEmpty) {
-              _onImageDropped(details.files.first.path);
-            }
-          },
-          child: Container(
-            height: 200,
-            width: 200,
-            color: _dragging ? Colors.blue[100] : Colors.grey[200],
-            child: const Center(
-              child: Text('Drag and Drop Image Here'),
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          DropTarget(
+            onDragEntered: (details) {
+              setState(() {
+                _dragging = true;
+              });
+            },
+            onDragExited: (details) {
+              setState(() {
+                _dragging = false;
+              });
+            },
+            onDragDone: (details) {
+              if (details.files.isNotEmpty) {
+                _onImageDropped(details.files.first.path);
+              }
+            },
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                height: 200,
+                width: 200,
+                decoration: BoxDecoration(
+                  color: _dragging ? Colors.blue[100] : Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _dragging ? Colors.blue : Colors.grey,
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    'Drag and Drop Image Here',
+                    style: TextStyle(
+                      color: _dragging ? Colors.blue : Colors.black54,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 20),
-        if (_uploadedImage != null)
-          Image.file(
-            _uploadedImage!,
-            height: 200,
-            width: 200,
-          ),
-      ],
+          const SizedBox(height: 20),
+          if (_uploadedImage != null)
+            Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  _uploadedImage!,
+                  height: 200,
+                  width: 200,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 } 
