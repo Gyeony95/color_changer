@@ -58,32 +58,31 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
   }
 
   Future<void> _extractColorsFromSvg() async {
-    if (_uploadedImage != null) {
-      final svgString = await _uploadedImage!.readAsString();
-      _svgDocument = XmlDocument.parse(svgString);
-      final colors = <Color>{};
+    if(_uploadedImage == null) return;
+    final svgString = await _uploadedImage!.readAsString();
+    _svgDocument = XmlDocument.parse(svgString);
+    final colors = <Color>{};
 
-      for (final element in _svgDocument!.findAllElements('*')) {
-        final fill = element.getAttribute('fill');
-        if (fill != null && fill.startsWith('#')) {
-          colors.add(_hexToColor(fill));
-        }
+    for (final element in _svgDocument!.findAllElements('*')) {
+      final fill = element.getAttribute('fill');
+      if (fill != null && fill.startsWith('#')) {
+        colors.add(_hexToColor(fill));
       }
-
-      for (final gradient in _svgDocument!.findAllElements('linearGradient')) {
-        for (final stop in gradient.findAllElements('stop')) {
-          final stopColor = stop.getAttribute('stop-color');
-          if (stopColor != null && stopColor.startsWith('#')) {
-            colors.add(_hexToColor(stopColor));
-          }
-        }
-      }
-
-      setState(() {
-        _colors = colors.toList();
-        _modifiedSvgString = _svgDocument!.toXmlString(pretty: true);
-      });
     }
+
+    for (final gradient in _svgDocument!.findAllElements('linearGradient')) {
+      for (final stop in gradient.findAllElements('stop')) {
+        final stopColor = stop.getAttribute('stop-color');
+        if (stopColor != null && stopColor.startsWith('#')) {
+          colors.add(_hexToColor(stopColor));
+        }
+      }
+    }
+
+    setState(() {
+      _colors = colors.toList();
+      _modifiedSvgString = _svgDocument!.toXmlString(pretty: true);
+    });
   }
 
 
@@ -233,20 +232,19 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
   }
 
   Future<void> _extractColors() async {
-    if (_uploadedImage != null) {
-      final paletteGenerator = await PaletteGenerator.fromImageProvider(
-        FileImage(_uploadedImage!),
-        size: const Size(200, 200),
-        maximumColorCount: 10,
-      );
-      setState(() {
-        _colors = paletteGenerator.colors.toList();
-      });
+    if(_uploadedImage == null) return;
+    final paletteGenerator = await PaletteGenerator.fromImageProvider(
+      FileImage(_uploadedImage!),
+      size: const Size(200, 200),
+      maximumColorCount: 10,
+    );
+    setState(() {
+      _colors = paletteGenerator.colors.toList();
+    });
 
-      final bytes = await _uploadedImage!.readAsBytes();
-      _originalImage = img.decodeImage(Uint8List.fromList(bytes));
-      _modifiedImage = _originalImage;
-    }
+    final bytes = await _uploadedImage!.readAsBytes();
+    _originalImage = img.decodeImage(Uint8List.fromList(bytes));
+    _modifiedImage = _originalImage;
   }
 
   void _changeColor(Color targetColor, Color newColor) {
@@ -303,6 +301,7 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
         (a.blue - b.blue).abs() < 255 * tolerance;
   }
 
+  // 그라데이션 방향 판별 로직
   void _detectGradientDirection() {
     if (_originalImage == null) return;
 
@@ -367,7 +366,6 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
         int g = (startColor.green * (1 - t) + endColor.green * t).toInt();
         int b = (startColor.blue * (1 - t) + endColor.blue * t).toInt();
 
-        Color newColor = Color.fromARGB(255, r, g, b);
         int pixel = tempImage.getPixel(x, y);
         Color pixelColor = Color.fromARGB(
           img.getAlpha(pixel),
@@ -393,14 +391,14 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
     return Column(
       children: [
         const Text('Gradient Start Color'),
-        _buildColorPicker2(startColor, (newColor) {
+        _buildColorPicker(startColor, (newColor) {
           setState(() {
             startColor = newColor;
             _applyGradient();
           });
         }),
         const Text('Gradient End Color'),
-        _buildColorPicker2(endColor, (newColor) {
+        _buildColorPicker(endColor, (newColor) {
           setState(() {
             endColor = newColor;
             _applyGradient();
@@ -410,7 +408,7 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
     );
   }
 
-  Widget _buildColorPicker2(Color color, ValueChanged<Color> onColorChanged) {
+  Widget _buildColorPicker(Color color, ValueChanged<Color> onColorChanged) {
     return GestureDetector(
       onTap: () {
         showDialog(
@@ -440,15 +438,21 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
           },
         );
       },
-      child: Container(
-        width: 50,
-        height: 50,
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.black26),
-        ),
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.black26),
+            ),
+          ),
+          const SizedBox(width: 8,),
+          Text(color.toHexString()),
+        ],
       ),
     );
   }
@@ -634,7 +638,7 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
         children: [
           const Text('Colors'),
           ..._colors.map((color) {
-            return _buildColorPicker(color);
+            return _buildColorPicker(color, (_){});
           }).toList(),
           const SizedBox(height: 20),
           const Text('Gradient Colors'),
@@ -642,49 +646,6 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
             return _buildGradientColorPicker(color);
           }).toList(),
         ],
-      ),
-    );
-  }
-
-  Widget _buildColorPicker(Color color) {
-    return GestureDetector(
-      onTap: () {
-        showDialog(
-          context: context,
-          builder: (context) {
-            Color newColor = color;
-            return AlertDialog(
-              title: const Text('Pick a color'),
-              content: SingleChildScrollView(
-                child: ColorPicker(
-                  pickerColor: color,
-                  onColorChanged: (selectedColor) {
-                    newColor = selectedColor;
-                  },
-                ),
-              ),
-              actions: <Widget>[
-                ElevatedButton(
-                  child: const Text('Select'),
-                  onPressed: () {
-                    _changeColor(color, newColor);
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
-      child: Container(
-        width: 50,
-        height: 50,
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.black26),
-        ),
       ),
     );
   }
