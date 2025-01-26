@@ -242,7 +242,7 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
     );
   }
 
-  void _onImageDropped(String path) async {
+  Future<void> _onImageDropped(String path) async {
     setState(() {
       _uploadedImage = File(path);
       _isSvg = path.endsWith('.svg');
@@ -253,7 +253,6 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
       await _extractColors();
       _backupImage = _originalImage!.clone();
     }
-    setState(() {});
   }
 
   Future<void> _extractColorsFromSvg() async {
@@ -341,11 +340,10 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
 
     setState(() {
       _modifiedImage = tempImage;
-      int index = _colors.indexOf(targetColor);
-      if (index != -1) {
-        _colors[index] = newColor;
-      }
     });
+
+    // 색상 변경 후 새로운 색상 목록 추출
+    _updateColors();
   }
 
   void _changeSvgColor(Color targetColor, Color newColor) {
@@ -423,16 +421,45 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
     setState(() {
       _modifiedImage = _backupImage!.clone();
     });
+    // 초기화 후 새로운 색상 목록 추출
+    _updateColors();
   }
 
-  // 파일 선택 다이얼로그를 여는 메서드 추가
+  // 새로운 메서드: 현재 이미지에서 색상 목록 업데이트
+  Future<void> _updateColors() async {
+    if (_isSvg) {
+      await _extractColorsFromSvg();
+    } else if (_modifiedImage != null) {
+      // 현재 수정된 이미지를 임시 파일로 저장
+      final tempDir = await Directory.systemTemp.createTemp();
+      final tempFile = File('${tempDir.path}/temp_image.png');
+      await tempFile.writeAsBytes(img.encodePng(_modifiedImage!));
+
+      // 색상 추출
+      final paletteGenerator = await PaletteGenerator.fromImageProvider(
+        FileImage(tempFile),
+        size: const Size(200, 200),
+        maximumColorCount: 10,
+      );
+
+      setState(() {
+        _colors = paletteGenerator.colors.toList();
+      });
+
+      // 임시 파일 및 디렉토리 삭제
+      await tempFile.delete();
+      await tempDir.delete();
+    }
+  }
+
   Future<void> _pickImage() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.image,
     );
 
     if (result != null && result.files.single.path != null) {
-      _onImageDropped(result.files.single.path!);
+      await _onImageDropped(result.files.single.path!);
+      // 새 이미지 로드 후 색상 목록 업데이트는 _onImageDropped에서 처리됨
     }
   }
 }

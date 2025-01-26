@@ -71,30 +71,6 @@ class MyHomePage extends StatelessWidget {
               child: const Text('그라데이션 변경'),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                textStyle: const TextStyle(fontSize: 20),
-              ),
-              onPressed: () {
-                // 여기에 다른 화면으로 이동하는 로직을 추가할 수 있습니다
-                // 예: Navigator.push(context, MaterialPageRoute(builder: (context) => OtherScreen()));
-              },
-              child: const Text('다른 기능'),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                textStyle: const TextStyle(fontSize: 20),
-              ),
-              onPressed: () {
-                // 여기에 또 다른 화면으로 이동하는 로직을 추가할 수 있습니다
-              },
-              child: const Text('추가 기능'),
-            ),
           ],
         ),
       ),

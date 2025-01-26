@@ -28,6 +28,11 @@ class _GradientWidgetState extends State<GradientWidget> {
   bool hasGradient = false;
   String gradientDirection = 'vertical';
 
+  // 원본 상태를 저장하기 위한 변수들 추가
+  String _originalDirection = 'vertical';
+  Color _originalStartColor = Colors.transparent;
+  Color _originalEndColor = Colors.transparent;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -266,7 +271,17 @@ class _GradientWidgetState extends State<GradientWidget> {
   }
 
   void _resetImage() {
-    // 기존 코드 그대로 가져오기
+    if (_backupImage == null) return;
+
+    setState(() {
+      _modifiedImage = _backupImage!.clone();
+      // 원본 상태로 복원
+      gradientDirection = _originalDirection;
+      startColor = _originalStartColor;
+      endColor = _originalEndColor;
+      // 그라데이션 다시 적용
+      _applyGradient();
+    });
   }
 
   Future<void> _loadImage() async {
@@ -276,10 +291,11 @@ class _GradientWidgetState extends State<GradientWidget> {
     _originalImage = img.decodeImage(bytes);
     if (_originalImage == null) return;
 
+    // 백업 이미지 저장
     _backupImage = _originalImage!.clone();
     _modifiedImage = _originalImage!.clone();
 
-    // 그라데이션 감지
+    // 그라데이션 감지 (이 과정에서 원본 상태가 저장됨)
     _detectGradientDirection();
 
     setState(() {});
@@ -350,6 +366,10 @@ class _GradientWidgetState extends State<GradientWidget> {
       endColor = _getColorFromPixel(topRightPixel);
     }
 
+    // 원본 상태 저장
+    _originalDirection = gradientDirection;
+    _originalStartColor = startColor;
+    _originalEndColor = endColor;
     originalStartColor = startColor;
     originalEndColor = endColor;
     hasGradient = true;

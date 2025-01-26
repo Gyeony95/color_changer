@@ -59,10 +59,6 @@ class ColorItem extends StatelessWidget {
         height: 50,
         margin: const EdgeInsets.symmetric(vertical: 4),
         decoration: BoxDecoration(
-          image: const DecorationImage(
-            image: AssetImage('assets/transparency_grid.png'),
-            repeat: ImageRepeat.repeat,
-          ),
           color: color,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.black26),
