@@ -17,18 +17,28 @@ class ColorItem extends StatelessWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Pick a gradient color'),
+          title: const Text('색상 선택'),
           content: SingleChildScrollView(
             child: ColorPicker(
               pickerColor: color,
               onColorChanged: (selectedColor) {
                 newColor = selectedColor;
               },
+              enableAlpha: true,
+              displayThumbColor: true,
+              pickerAreaHeightPercent: 0.8,
+              labelTypes: const [],
             ),
           ),
           actions: <Widget>[
+            TextButton(
+              child: const Text('취소'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
             ElevatedButton(
-              child: const Text('Select'),
+              child: const Text('선택'),
               onPressed: () {
                 onColorSelected(newColor);
                 Navigator.of(context).pop();
@@ -49,6 +59,10 @@ class ColorItem extends StatelessWidget {
         height: 50,
         margin: const EdgeInsets.symmetric(vertical: 4),
         decoration: BoxDecoration(
+          image: const DecorationImage(
+            image: AssetImage('assets/transparency_grid.png'),
+            repeat: ImageRepeat.repeat,
+          ),
           color: color,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.black26),

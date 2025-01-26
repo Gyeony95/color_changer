@@ -392,30 +392,28 @@ class _GradientWidgetState extends State<GradientWidget> {
             t = x / width;
             break;
           case 'diagonal_down':
-            // 왼쪽 위에서 오른쪽 아래로
             t = (x / width + y / height) / 2;
             break;
           case 'diagonal_up':
-            // 왼쪽 아래에서 오른쪽 위로
             t = (x / width + (height - y) / height) / 2;
             break;
           default:
             t = y / height;
         }
 
-        // t 값이 0~1 범위를 벗어나지 않도록 보정
         t = t.clamp(0.0, 1.0);
 
         int r = (startColor.red * (1 - t) + endColor.red * t).toInt();
         int g = (startColor.green * (1 - t) + endColor.green * t).toInt();
         int b = (startColor.blue * (1 - t) + endColor.blue * t).toInt();
+        int a = (startColor.alpha * (1 - t) + endColor.alpha * t).toInt();
 
         int pixel = tempImage.getPixel(x, y);
         Color pixelColor = _getColorFromPixel(pixel);
 
         if (ColorUtil.isColorSimilar(pixelColor, originalStartColor) ||
             ColorUtil.isColorSimilar(pixelColor, originalEndColor)) {
-          tempImage.setPixel(x, y, img.getColor(r, g, b));
+          tempImage.setPixel(x, y, img.getColor(r, g, b, a));
         }
       }
     }
