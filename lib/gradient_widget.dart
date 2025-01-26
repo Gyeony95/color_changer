@@ -1,3 +1,4 @@
+import 'package:color_changer/utils/download_util.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:color_changer/utils/color_util.dart';
@@ -6,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'package:image/image.dart' as img;
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:path_provider/path_provider.dart';
 
 class GradientWidget extends StatefulWidget {
   const GradientWidget({super.key});
@@ -328,7 +330,8 @@ class _GradientWidgetState extends State<GradientWidget> {
   }
 
   Future<void> _downloadModifiedImage() async {
-    // 기존 코드 그대로 가져오기
+    if (_modifiedImage == null) return;
+    await DownloadUtil.downloadImage(_modifiedImage!, context);
   }
 
   void _resetImage() {

@@ -1,4 +1,5 @@
 import 'package:color_changer/utils/color_util.dart';
+import 'package:color_changer/utils/download_util.dart';
 import 'package:color_changer/widgets/color_item.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -381,41 +382,13 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
   Future<void> _downloadModifiedImage() async {
     if (_isSvg) {
       if (_modifiedSvgString == null) return;
-
-      final filePath = await _selectFilePath('modified_image.svg');
-      if (filePath == null) return;
-
-      final file = File(filePath);
-      await file.writeAsString(_modifiedSvgString!);
-
-      // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('SVG 파일이 저장되었습니다: $filePath')),
-      );
+      await DownloadUtil.downloadSvgImage(_modifiedSvgString!, context);
     } else {
       if (_modifiedImage == null) return;
-
-      final filePath = await _selectFilePath('modified_image.png');
-      if (filePath == null) return;
-
-      final file = File(filePath);
-      await file.writeAsBytes(img.encodePng(_modifiedImage!));
-
-      // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('이미지 파일이 저장되었습니다: $filePath')),
-      );
+      await DownloadUtil.downloadImage(_modifiedImage!, context);
     }
   }
 
-  Future<String?> _selectFilePath(String defaultFileName) async {
-    final result = await FilePicker.platform.saveFile(
-      dialogTitle: '파일 저장',
-      fileName: defaultFileName,
-    );
-
-    return result; // 선택된 파일 경로를 반환합니다.
-  }
 
   void _resetImage() {
     setState(() {
