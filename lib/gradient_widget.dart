@@ -158,10 +158,16 @@ class _GradientWidgetState extends State<GradientWidget> {
           borderRadius: BorderRadius.circular(12),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: Image.memory(
-              Uint8List.fromList(img.encodePng(_modifiedImage!)),
-              height: 300,
-              fit: BoxFit.contain,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              switchInCurve: Curves.easeInOut,
+              switchOutCurve: Curves.easeInOut,
+              child: Image.memory(
+                key: ValueKey<int>(identityHashCode(_modifiedImage)),
+                Uint8List.fromList(img.encodePng(_modifiedImage!)),
+                height: 300,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
         ),
@@ -327,7 +333,7 @@ class _GradientWidgetState extends State<GradientWidget> {
 
   void _resetImage() {
     if (_backupImage == null) return;
-    
+
     setState(() {
       _modifiedImage = _backupImage!.clone();
       gradientDirection = _originalDirection;
@@ -467,6 +473,15 @@ class _GradientWidgetState extends State<GradientWidget> {
     final width = tempImage.width;
     final height = tempImage.height;
 
+    // 성능 최적화를 위해 픽셀 데이터를 미리 계산
+    final pixels = List.generate(
+      height,
+      (y) => List.generate(
+        width,
+        (x) => tempImage.getPixel(x, y),
+      ),
+    );
+
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
         double t;
@@ -493,17 +508,18 @@ class _GradientWidgetState extends State<GradientWidget> {
         }
 
         t = t.clamp(0.0, 1.0);
+        t = _adjustGradientStop(t);
 
-        int r = (startColor.red * (1 - t) + endColor.red * t).toInt();
-        int g = (startColor.green * (1 - t) + endColor.green * t).toInt();
-        int b = (startColor.blue * (1 - t) + endColor.blue * t).toInt();
-        int a = (startColor.alpha * (1 - t) + endColor.alpha * t).toInt();
-
-        int pixel = tempImage.getPixel(x, y);
-        Color pixelColor = _getColorFromPixel(pixel);
+        final pixel = pixels[y][x];
+        final pixelColor = _getColorFromPixel(pixel);
 
         if (ColorUtil.isColorSimilar(pixelColor, originalStartColor) ||
             ColorUtil.isColorSimilar(pixelColor, originalEndColor)) {
+          final r = (startColor.red * (1 - t) + endColor.red * t).toInt();
+          final g = (startColor.green * (1 - t) + endColor.green * t).toInt();
+          final b = (startColor.blue * (1 - t) + endColor.blue * t).toInt();
+          final a = (startColor.alpha * (1 - t) + endColor.alpha * t).toInt();
+
           tempImage.setPixel(x, y, img.getColor(r, g, b, a));
         }
       }
