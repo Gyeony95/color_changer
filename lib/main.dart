@@ -16,7 +16,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Image Uploader Home Page'),
+      home: const MyHomePage(title: 'Image Tools'),
     );
   }
 }
@@ -32,7 +32,54 @@ class MyHomePage extends StatelessWidget {
       appBar: AppBar(
         title: Text(title),
       ),
-      body: const ImageUploadWidget(),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                textStyle: const TextStyle(fontSize: 20),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ImageUploadWidget(),
+                  ),
+                );
+              },
+              child: const Text('이미지 색상 변경'),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                textStyle: const TextStyle(fontSize: 20),
+              ),
+              onPressed: () {
+                // 여기에 다른 화면으로 이동하는 로직을 추가할 수 있습니다
+                // 예: Navigator.push(context, MaterialPageRoute(builder: (context) => OtherScreen()));
+              },
+              child: const Text('다른 기능'),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                textStyle: const TextStyle(fontSize: 20),
+              ),
+              onPressed: () {
+                // 여기에 또 다른 화면으로 이동하는 로직을 추가할 수 있습니다
+              },
+              child: const Text('추가 기능'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

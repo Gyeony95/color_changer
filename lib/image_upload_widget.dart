@@ -39,92 +39,121 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _dragAndImageWidget(),
-                const SizedBox(width: 20),
-                _colorList(),
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('이미지 색상 변경'),
+      ),
+      body: SingleChildScrollView(
+        child: Container(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 상단 설명 텍스트
+              const Text(
+                '이미지를 업로드하여 주요 색상을 분석하세요',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // 드래그 앤 드롭 영역
+              _buildDropTarget(),
+
+              // 이미지 미리보기 및 색상 분석 영역
+              if (_uploadedImage != null) ...[
+                const SizedBox(height: 32),
+                const Text(
+                  '이미지 미리보기',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildImageDisplay(),
+                const SizedBox(height: 32),
+                const Text(
+                  '추출된 색상',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildColorGrid(),
+                if (hasGradient) ...[
+                  const SizedBox(height: 24),
+                  _buildGradientEditor(),
+                ],
+                const SizedBox(height: 32),
+                _buildActionButtons(),
               ],
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _downloadModifiedImage,
-              child: const Text('Download Modified Image'),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: _resetImage,
-              child: const Text('Reset Image'),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _dragAndImageWidget() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        _buildDropTarget(),
-        const SizedBox(height: 20),
-        if (_uploadedImage != null) _buildImageDisplay(),
-        if (hasGradient) ...[
-          const SizedBox(height: 20),
-          _buildGradientEditor(),
-        ],
-      ],
-    );
-  }
-
   Widget _buildDropTarget() {
     return DropTarget(
-      onDragEntered: (details) {
-        setState(() {
-          _dragging = true;
-        });
-      },
-      onDragExited: (details) {
-        setState(() {
-          _dragging = false;
-        });
-      },
+      onDragEntered: (details) => setState(() => _dragging = true),
+      onDragExited: (details) => setState(() => _dragging = false),
       onDragDone: (details) {
         if (details.files.isNotEmpty) {
           _onImageDropped(details.files.first.path);
         }
       },
-      child: Material(
-        elevation: 4,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          height: 200,
-          width: 200,
-          decoration: BoxDecoration(
-            color: _dragging ? Colors.blue[100] : Colors.grey[200],
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _dragging ? Colors.blue : Colors.grey,
-              width: 2,
-            ),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _dragging
+                ? Theme.of(context).primaryColor
+                : Colors.grey.shade300,
+            width: 2,
+            // style: BorderStyle.dashed,
           ),
-          child: Center(
-            child: Text(
-              'Drag and Drop Image Here',
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.cloud_upload_outlined,
+              size: 48,
+              color: _dragging ? Theme.of(context).primaryColor : Colors.grey,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '이미지를 여기에 드래그하거나',
               style: TextStyle(
-                color: _dragging ? Colors.blue : Colors.black54,
-                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+                fontSize: 16,
               ),
             ),
-          ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: _pickImage,
+              child: const Text('파일 선택하기'),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '지원 형식: PNG, JPG, JPEG (최대 5MB)',
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 14,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -162,20 +191,65 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
     );
   }
 
-  Widget _colorList() {
-    return SingleChildScrollView(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const Text('Colors'),
-          ..._colors.map((color) {
-            return ColorItem(
-                color: color,
-                onColorSelected: (newColor) => _changeColor(color, newColor));
-          }),
-        ],
+  Widget _buildColorGrid() {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 6,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 0.8,
       ),
+      itemCount: _colors.length,
+      itemBuilder: (context, index) {
+        final color = _colors[index];
+        return Column(
+          children: [
+            ColorItem(
+              color: color,
+              onColorSelected: (newColor) => _changeColor(color, newColor),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              ColorUtil.colorToHex(color),
+              style: const TextStyle(fontSize: 12),
+            ),
+            Text(
+              'RGB(${color.red}, ${color.green}, ${color.blue})',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ElevatedButton.icon(
+          onPressed: _downloadModifiedImage,
+          icon: const Icon(Icons.download),
+          label: const Text('수정된 이미지 다운로드'),
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+        ),
+        const SizedBox(width: 16),
+        OutlinedButton.icon(
+          onPressed: _resetImage,
+          icon: const Icon(Icons.refresh),
+          label: const Text('초기화'),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+        ),
+      ],
     );
   }
 
@@ -537,5 +611,16 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
       startColor = originalStartColor;
       endColor = originalEndColor;
     });
+  }
+
+  // 파일 선택 다이얼로그를 여는 메서드 추가
+  Future<void> _pickImage() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+    );
+
+    if (result != null && result.files.single.path != null) {
+      _onImageDropped(result.files.single.path!);
+    }
   }
 }
