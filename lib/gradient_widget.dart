@@ -33,6 +33,9 @@ class _GradientWidgetState extends State<GradientWidget> {
   Color _originalStartColor = Colors.transparent;
   Color _originalEndColor = Colors.transparent;
 
+  // 축 위치를 저장하는 변수 추가
+  double _axisPosition = 0.5; // 0.0 ~ 1.0
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -211,6 +214,41 @@ class _GradientWidgetState extends State<GradientWidget> {
             ),
           ],
         ),
+        const SizedBox(height: 24),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '그라데이션 중간점 조절',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Text('시작색'),
+                Expanded(
+                  child: Slider(
+                    value: _axisPosition,
+                    onChanged: (value) {
+                      setState(() {
+                        _axisPosition = value;
+                      });
+                      _applyGradient();
+                    },
+                    min: 0.0,
+                    max: 1.0,
+                    divisions: 100,
+                    label: '${(_axisPosition * 100).round()}%',
+                  ),
+                ),
+                const Text('끝색'),
+              ],
+            ),
+          ],
+        ),
         const SizedBox(height: 16),
         SegmentedButton<String>(
           segments: const [
@@ -289,14 +327,13 @@ class _GradientWidgetState extends State<GradientWidget> {
 
   void _resetImage() {
     if (_backupImage == null) return;
-
+    
     setState(() {
       _modifiedImage = _backupImage!.clone();
-      // 원본 상태로 복원
       gradientDirection = _originalDirection;
       startColor = _originalStartColor;
       endColor = _originalEndColor;
-      // 그라데이션 다시 적용
+      _axisPosition = 0.5; // 축 위치도 초기화
       _applyGradient();
     });
   }
@@ -436,15 +473,20 @@ class _GradientWidgetState extends State<GradientWidget> {
         switch (gradientDirection) {
           case 'vertical':
             t = y / height;
+            // 중간점을 기준으로 색상 비율 조정
+            t = _adjustGradientStop(t);
             break;
           case 'horizontal':
             t = x / width;
+            t = _adjustGradientStop(t);
             break;
           case 'diagonal_down':
             t = (x / width + y / height) / 2;
+            t = _adjustGradientStop(t);
             break;
           case 'diagonal_up':
             t = (x / width + (height - y) / height) / 2;
+            t = _adjustGradientStop(t);
             break;
           default:
             t = y / height;
@@ -470,6 +512,18 @@ class _GradientWidgetState extends State<GradientWidget> {
     setState(() {
       _modifiedImage = tempImage;
     });
+  }
+
+  // 그라데이션 중간점 조정 메서드 추가
+  double _adjustGradientStop(double t) {
+    // _axisPosition이 0.5일 때는 선형 그라데이션
+    // 0.5보다 작으면 시작 색상 구간이 늘어나고
+    // 0.5보다 크면 끝 색상 구간이 늘어남
+    if (t < _axisPosition) {
+      return t / (2 * _axisPosition);
+    } else {
+      return 0.5 + (t - _axisPosition) / (2 * (1 - _axisPosition));
+    }
   }
 
   Future<void> _onImageDropped(String path) async {
