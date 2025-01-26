@@ -30,13 +30,6 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
   XmlDocument? _svgDocument;
   String? _modifiedSvgString;
 
-  Color startColor = Colors.transparent;
-  Color endColor = Colors.transparent;
-  Color originalStartColor = Colors.transparent;
-  Color originalEndColor = Colors.transparent;
-  bool hasGradient = false;
-  String gradientDirection = 'vertical';
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -88,10 +81,6 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
                 ),
                 const SizedBox(height: 16),
                 _buildColorGrid(),
-                if (hasGradient) ...[
-                  const SizedBox(height: 24),
-                  _buildGradientEditor(),
-                ],
                 const SizedBox(height: 32),
                 _buildActionButtons(),
               ],
@@ -262,11 +251,7 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
       await _extractColorsFromSvg();
     } else {
       await _extractColors();
-      await processGradientAndApply(path);
-      _detectGradientDirection();
       _backupImage = _originalImage!.clone();
-      originalStartColor = startColor;
-      originalEndColor = endColor;
     }
     setState(() {});
   }
@@ -299,60 +284,68 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
     });
   }
 
-  Future<void> processGradientAndApply(String assetPath) async {
-    final File file = File(assetPath);
-    final Uint8List bytes = await file.readAsBytes();
+  Future<void> _extractColors() async {
+    if (_uploadedImage == null) return;
+    final paletteGenerator = await PaletteGenerator.fromImageProvider(
+      FileImage(_uploadedImage!),
+      size: const Size(200, 200),
+      maximumColorCount: 10,
+    );
+    setState(() {
+      _colors = paletteGenerator.colors.toList();
+    });
 
-    final ui.Image image = await decodeImageFromList(bytes);
+    final bytes = await _uploadedImage!.readAsBytes();
+    _originalImage = img.decodeImage(Uint8List.fromList(bytes));
+    _modifiedImage = _originalImage;
+  }
 
-    final ByteData? pixelData =
-        await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+  void _changeColor(Color targetColor, Color newColor) {
+    if (_isSvg) {
+      _changeSvgColor(targetColor, newColor);
+      return;
+    }
 
-    if (pixelData == null) return;
+    if (_originalImage == null) return;
 
-    final Uint8List pixels = pixelData.buffer.asUint8List();
+    img.Image tempImage = img.copyResize(
+      _modifiedImage ?? _originalImage!,
+      width: _originalImage!.width,
+      height: _originalImage!.height,
+    );
 
-    const int threshold = 30;
-    int? startPixelIndex;
-    int? endPixelIndex;
+    for (int y = 0; y < tempImage.height; y++) {
+      for (int x = 0; x < tempImage.width; x++) {
+        int pixel = tempImage.getPixel(x, y);
+        Color pixelColor = Color.fromARGB(
+          img.getAlpha(pixel),
+          img.getRed(pixel),
+          img.getGreen(pixel),
+          img.getBlue(pixel),
+        );
 
-    // Image dimensions
-    final int width = image.width;
-    final int height = image.height;
-
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
-        final int index = (y * width + x) * 4;
-        final int r = pixels[index];
-        final int g = pixels[index + 1];
-        final int b = pixels[index + 2];
-
-        startPixelIndex ??= index;
-
-        endPixelIndex = index;
+        if (ColorUtil.isColorSimilar(pixelColor, targetColor)) {
+          tempImage.setPixel(
+            x,
+            y,
+            img.getColor(
+              newColor.red,
+              newColor.green,
+              newColor.blue,
+              newColor.alpha,
+            ),
+          );
+        }
       }
     }
 
-    if (startPixelIndex != null && endPixelIndex != null) {
-      // Extract start and end colors
-      startColor = Color.fromARGB(
-        255,
-        pixels[startPixelIndex],
-        pixels[startPixelIndex + 1],
-        pixels[startPixelIndex + 2],
-      );
-
-      endColor = Color.fromARGB(
-        255,
-        pixels[endPixelIndex],
-        pixels[endPixelIndex + 1],
-        pixels[endPixelIndex + 2],
-      );
-
-      setState(() {
-        hasGradient = true;
-      });
-    }
+    setState(() {
+      _modifiedImage = tempImage;
+      int index = _colors.indexOf(targetColor);
+      if (index != -1) {
+        _colors[index] = newColor;
+      }
+    });
   }
 
   void _changeSvgColor(Color targetColor, Color newColor) {
@@ -426,190 +419,9 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
     return result; // 선택된 파일 경로를 반환합니다.
   }
 
-  Future<void> _extractColors() async {
-    if (_uploadedImage == null) return;
-    final paletteGenerator = await PaletteGenerator.fromImageProvider(
-      FileImage(_uploadedImage!),
-      size: const Size(200, 200),
-      maximumColorCount: 10,
-    );
-    setState(() {
-      _colors = paletteGenerator.colors.toList();
-    });
-
-    final bytes = await _uploadedImage!.readAsBytes();
-    _originalImage = img.decodeImage(Uint8List.fromList(bytes));
-    _modifiedImage = _originalImage;
-  }
-
-  void _changeColor(Color targetColor, Color newColor) {
-    if (_isSvg) {
-      _changeSvgColor(targetColor, newColor);
-      return;
-    }
-
-    if (_originalImage == null) return;
-
-    img.Image tempImage = img.copyResize(
-      _modifiedImage ?? _originalImage!,
-      width: _originalImage!.width,
-      height: _originalImage!.height,
-    );
-
-    for (int y = 0; y < tempImage.height; y++) {
-      for (int x = 0; x < tempImage.width; x++) {
-        int pixel = tempImage.getPixel(x, y);
-        Color pixelColor = Color.fromARGB(
-          img.getAlpha(pixel),
-          img.getRed(pixel),
-          img.getGreen(pixel),
-          img.getBlue(pixel),
-        );
-
-        if (ColorUtil.isColorSimilar(pixelColor, targetColor)) {
-          tempImage.setPixel(
-            x,
-            y,
-            img.getColor(
-              newColor.red,
-              newColor.green,
-              newColor.blue,
-              newColor.alpha,
-            ),
-          );
-        }
-      }
-    }
-
-    setState(() {
-      _modifiedImage = tempImage;
-      int index = _colors.indexOf(targetColor);
-      if (index != -1) {
-        _colors[index] = newColor;
-      }
-    });
-  }
-
-  // 그라데이션 방향 판별 로직
-  void _detectGradientDirection() {
-    if (_originalImage == null) return;
-
-    final int width = _originalImage!.width;
-    final int height = _originalImage!.height;
-
-    int verticalChange = 0;
-    int horizontalChange = 0;
-    int diagonalChange = 0;
-
-    for (int y = 0; y < height - 1; y++) {
-      for (int x = 0; x < width - 1; x++) {
-        int currentPixel = _originalImage!.getPixel(x, y);
-        int nextVerticalPixel = _originalImage!.getPixel(x, y + 1);
-        int nextHorizontalPixel = _originalImage!.getPixel(x + 1, y);
-        int nextDiagonalPixel = _originalImage!.getPixel(x + 1, y + 1);
-
-        verticalChange += _colorDifference(currentPixel, nextVerticalPixel);
-        horizontalChange += _colorDifference(currentPixel, nextHorizontalPixel);
-        diagonalChange += _colorDifference(currentPixel, nextDiagonalPixel);
-      }
-    }
-
-    setState(() {
-      hasGradient = true;
-      if (verticalChange > horizontalChange &&
-          verticalChange > diagonalChange) {
-        gradientDirection = 'vertical';
-      } else if (horizontalChange > verticalChange &&
-          horizontalChange > diagonalChange) {
-        gradientDirection = 'horizontal';
-      } else {
-        gradientDirection = 'diagonal';
-      }
-    });
-  }
-
-  int _colorDifference(int pixel1, int pixel2) {
-    int rDiff = (img.getRed(pixel1) - img.getRed(pixel2)).abs();
-    int gDiff = (img.getGreen(pixel1) - img.getGreen(pixel2)).abs();
-    int bDiff = (img.getBlue(pixel1) - img.getBlue(pixel2)).abs();
-    return rDiff + gDiff + bDiff;
-  }
-
-  void _applyGradient() {
-    if (_originalImage == null || !hasGradient) return;
-
-    img.Image tempImage = img.copyResize(
-      _modifiedImage ?? _originalImage!,
-      width: _originalImage!.width,
-      height: _originalImage!.height,
-    );
-
-    for (int y = 0; y < tempImage.height; y++) {
-      for (int x = 0; x < tempImage.width; x++) {
-        double t;
-        if (gradientDirection == 'vertical') {
-          t = y / tempImage.height;
-        } else {
-          // horizontal
-          t = x / tempImage.width;
-        }
-
-        int r = (startColor.red * (1 - t) + endColor.red * t).toInt();
-        int g = (startColor.green * (1 - t) + endColor.green * t).toInt();
-        int b = (startColor.blue * (1 - t) + endColor.blue * t).toInt();
-
-        int pixel = tempImage.getPixel(x, y);
-        Color pixelColor = Color.fromARGB(
-          img.getAlpha(pixel),
-          img.getRed(pixel),
-          img.getGreen(pixel),
-          img.getBlue(pixel),
-        );
-
-        if (ColorUtil.isColorSimilar(pixelColor, startColor) ||
-            ColorUtil.isColorSimilar(pixelColor, endColor)) {
-          tempImage.setPixel(x, y, img.getColor(r, g, b));
-        }
-      }
-    }
-
-    setState(() {
-      _modifiedImage = tempImage;
-    });
-  }
-
-  Widget _buildGradientEditor() {
-    if (!hasGradient) return Container(); // 그라데이션이 없으면 빈 컨테이너 반환
-
-    return Column(
-      children: [
-        const Text('Gradient Start Color'),
-        ColorItem(
-            color: startColor,
-            onColorSelected: (newColor) {
-              setState(() {
-                startColor = newColor;
-                _applyGradient();
-              });
-            }),
-        const Text('Gradient End Color'),
-        ColorItem(
-            color: endColor,
-            onColorSelected: (newColor) {
-              setState(() {
-                endColor = newColor;
-                _applyGradient();
-              });
-            }),
-      ],
-    );
-  }
-
   void _resetImage() {
     setState(() {
       _modifiedImage = _backupImage!.clone();
-      startColor = originalStartColor;
-      endColor = originalEndColor;
     });
   }
 
