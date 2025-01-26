@@ -41,7 +41,7 @@ class _GradientWidgetState extends State<GradientWidget> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('그라데이션 변경'),
+        title: const Text('배경 그라데이션 변경'),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -76,8 +76,18 @@ class _GradientWidgetState extends State<GradientWidget> {
   Widget _buildImageUpload() {
     return DropTarget(
       onDragDone: (detail) async {
+        final file = File(detail.files.first.path);
+        if (file.path.toLowerCase().endsWith('.svg')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('SVG 파일은 지원하지 않는 형식입니다.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
         setState(() {
-          _uploadedImage = File(detail.files.first.path!);
+          _uploadedImage = file;
         });
         await _loadImage();
       },
@@ -263,7 +273,14 @@ class _GradientWidgetState extends State<GradientWidget> {
   }
 
   Future<void> _pickImage() async {
-    // 기존 코드 그대로 가져오기
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png'],
+    );
+
+    if (result != null && result.files.single.path != null) {
+      await _onImageDropped(result.files.single.path!);
+    }
   }
 
   Future<void> _downloadModifiedImage() async {
@@ -287,15 +304,27 @@ class _GradientWidgetState extends State<GradientWidget> {
   Future<void> _loadImage() async {
     if (_uploadedImage == null) return;
 
+    // SVG 파일 체크
+    if (_uploadedImage!.path.toLowerCase().endsWith('.svg')) {
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('SVG 파일은 지원하지 않는 형식입니다.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() {
+        _uploadedImage = null;
+      });
+      return;
+    }
+
     final bytes = await _uploadedImage!.readAsBytes();
     _originalImage = img.decodeImage(bytes);
     if (_originalImage == null) return;
 
-    // 백업 이미지 저장
     _backupImage = _originalImage!.clone();
     _modifiedImage = _originalImage!.clone();
-
-    // 그라데이션 감지 (이 과정에서 원본 상태가 저장됨)
     _detectGradientDirection();
 
     setState(() {});
@@ -441,5 +470,12 @@ class _GradientWidgetState extends State<GradientWidget> {
     setState(() {
       _modifiedImage = tempImage;
     });
+  }
+
+  Future<void> _onImageDropped(String path) async {
+    setState(() {
+      _uploadedImage = File(path);
+    });
+    await _loadImage();
   }
 }

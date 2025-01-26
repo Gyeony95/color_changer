@@ -68,7 +68,7 @@ class MyHomePage extends StatelessWidget {
                   ),
                 );
               },
-              child: const Text('그라데이션 변경'),
+              child: const Text('배경 그라데이션 변경'),
             ),
             const SizedBox(height: 20),
           ],
