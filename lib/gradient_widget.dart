@@ -202,10 +202,22 @@ class _GradientWidgetState extends State<GradientWidget> {
             ButtonSegment(
               value: 'vertical',
               label: Text('세로'),
+              icon: Icon(Icons.arrow_downward),
             ),
             ButtonSegment(
               value: 'horizontal',
               label: Text('가로'),
+              icon: Icon(Icons.arrow_forward),
+            ),
+            ButtonSegment(
+              value: 'diagonal_down',
+              label: Text('대각선 ↘'),
+              icon: Icon(Icons.trending_down),
+            ),
+            ButtonSegment(
+              value: 'diagonal_up',
+              label: Text('대각선 ↗'),
+              icon: Icon(Icons.trending_up),
             ),
           ],
           selected: {gradientDirection},
@@ -281,38 +293,61 @@ class _GradientWidgetState extends State<GradientWidget> {
 
     int verticalChange = 0;
     int horizontalChange = 0;
+    int diagonalDownChange = 0;
+    int diagonalUpChange = 0;
 
-    // 수직 방향 색상 변화 감지
+    // 모든 방향의 색상 변화 감지
     for (int y = 0; y < height - 1; y++) {
-      for (int x = 0; x < width; x++) {
-        int currentPixel = _originalImage!.getPixel(x, y);
-        int nextPixel = _originalImage!.getPixel(x, y + 1);
-        verticalChange += _colorDifference(currentPixel, nextPixel);
-      }
-    }
-
-    // 수평 방향 색상 변화 감지
-    for (int y = 0; y < height; y++) {
       for (int x = 0; x < width - 1; x++) {
         int currentPixel = _originalImage!.getPixel(x, y);
-        int nextPixel = _originalImage!.getPixel(x + 1, y);
-        horizontalChange += _colorDifference(currentPixel, nextPixel);
+        int verticalPixel = _originalImage!.getPixel(x, y + 1);
+        int horizontalPixel = _originalImage!.getPixel(x + 1, y);
+        int diagonalDownPixel = _originalImage!.getPixel(x + 1, y + 1);
+
+        // 대각선 상승 방향 (오른쪽 위)을 위한 픽셀
+        // y+1이 이미지 높이를 넘지 않도록 확인
+        int diagonalUpPixel =
+            y > 0 ? _originalImage!.getPixel(x + 1, y - 1) : currentPixel;
+
+        verticalChange += _colorDifference(currentPixel, verticalPixel);
+        horizontalChange += _colorDifference(currentPixel, horizontalPixel);
+        diagonalDownChange += _colorDifference(currentPixel, diagonalDownPixel);
+        diagonalUpChange += _colorDifference(currentPixel, diagonalUpPixel);
       }
     }
 
-    // 시작과 끝 색상 설정
-    if (verticalChange > horizontalChange) {
+    // 가장 큰 변화가 있는 방향을 그라데이션 방향으로 설정
+    int maxChange = [
+      verticalChange,
+      horizontalChange,
+      diagonalDownChange,
+      diagonalUpChange
+    ].reduce((curr, next) => curr > next ? curr : next);
+
+    if (maxChange == verticalChange) {
       gradientDirection = 'vertical';
       int topPixel = _originalImage!.getPixel(width ~/ 2, 0);
       int bottomPixel = _originalImage!.getPixel(width ~/ 2, height - 1);
       startColor = _getColorFromPixel(topPixel);
       endColor = _getColorFromPixel(bottomPixel);
-    } else {
+    } else if (maxChange == horizontalChange) {
       gradientDirection = 'horizontal';
       int leftPixel = _originalImage!.getPixel(0, height ~/ 2);
       int rightPixel = _originalImage!.getPixel(width - 1, height ~/ 2);
       startColor = _getColorFromPixel(leftPixel);
       endColor = _getColorFromPixel(rightPixel);
+    } else if (maxChange == diagonalDownChange) {
+      gradientDirection = 'diagonal_down';
+      int topLeftPixel = _originalImage!.getPixel(0, 0);
+      int bottomRightPixel = _originalImage!.getPixel(width - 1, height - 1);
+      startColor = _getColorFromPixel(topLeftPixel);
+      endColor = _getColorFromPixel(bottomRightPixel);
+    } else {
+      gradientDirection = 'diagonal_up';
+      int bottomLeftPixel = _originalImage!.getPixel(0, height - 1);
+      int topRightPixel = _originalImage!.getPixel(width - 1, 0);
+      startColor = _getColorFromPixel(bottomLeftPixel);
+      endColor = _getColorFromPixel(topRightPixel);
     }
 
     originalStartColor = startColor;
@@ -349,11 +384,27 @@ class _GradientWidgetState extends State<GradientWidget> {
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
         double t;
-        if (gradientDirection == 'vertical') {
-          t = y / height;
-        } else {
-          t = x / width;
+        switch (gradientDirection) {
+          case 'vertical':
+            t = y / height;
+            break;
+          case 'horizontal':
+            t = x / width;
+            break;
+          case 'diagonal_down':
+            // 왼쪽 위에서 오른쪽 아래로
+            t = (x / width + y / height) / 2;
+            break;
+          case 'diagonal_up':
+            // 왼쪽 아래에서 오른쪽 위로
+            t = (x / width + (height - y) / height) / 2;
+            break;
+          default:
+            t = y / height;
         }
+
+        // t 값이 0~1 범위를 벗어나지 않도록 보정
+        t = t.clamp(0.0, 1.0);
 
         int r = (startColor.red * (1 - t) + endColor.red * t).toInt();
         int g = (startColor.green * (1 - t) + endColor.green * t).toInt();
