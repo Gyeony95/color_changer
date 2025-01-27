@@ -7,6 +7,7 @@ import 'package:xml/xml.dart';
 import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as path;
+import 'package:color_changer/widgets/styled_container.dart';
 
 class BatchColorWidget extends StatefulWidget {
   const BatchColorWidget({super.key});
@@ -78,58 +79,60 @@ class _BatchColorWidgetState extends State<BatchColorWidget> {
   }
 
   Widget _buildDropZone() {
-    return DropTarget(
-      onDragDone: (detail) async {
-        final newFiles = detail.files
-            .where((file) {
-              final ext = path.extension(file.path).toLowerCase();
-              return ['.png', '.jpg', '.jpeg', '.svg'].contains(ext);
-            })
-            .map((file) => File(file.path))
-            .toList();
+    return StyledContainer(
+      child: DropTarget(
+        onDragDone: (detail) async {
+          final newFiles = detail.files
+              .where((file) {
+                final ext = path.extension(file.path).toLowerCase();
+                return ['.png', '.jpg', '.jpeg', '.svg'].contains(ext);
+              })
+              .map((file) => File(file.path))
+              .toList();
 
-        setState(() {
-          _uploadedFiles.addAll(newFiles);
-        });
-      },
-      onDragEntered: (detail) {
-        setState(() {
-          _dragging = true;
-        });
-      },
-      onDragExited: (detail) {
-        setState(() {
-          _dragging = false;
-        });
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: _dragging ? Colors.blue.shade50 : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: _dragging ? Colors.blue : Colors.grey.shade300,
-            width: 2,
+          setState(() {
+            _uploadedFiles.addAll(newFiles);
+          });
+        },
+        onDragEntered: (detail) {
+          setState(() {
+            _dragging = true;
+          });
+        },
+        onDragExited: (detail) {
+          setState(() {
+            _dragging = false;
+          });
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: _dragging ? Colors.blue.shade50 : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _dragging ? Colors.blue : Colors.grey.shade300,
+              width: 2,
+            ),
           ),
-        ),
-        child: Column(
-          children: [
-            const Icon(Icons.file_upload, size: 48, color: Colors.grey),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _pickFiles,
-              child: const Text('파일 선택'),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '지원 형식: PNG, JPG, JPEG, SVG',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 14,
+          child: Column(
+            children: [
+              const Icon(Icons.file_upload, size: 48, color: Colors.grey),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _pickFiles,
+                child: const Text('파일 선택'),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              Text(
+                '지원 형식: PNG, JPG, JPEG, SVG',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -138,48 +141,50 @@ class _BatchColorWidgetState extends State<BatchColorWidget> {
   Widget _buildFileList() {
     if (_uploadedFiles.isEmpty) return const SizedBox();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '선택된 파일 (${_uploadedFiles.length}개)',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
+    return StyledContainer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '선택된 파일 (${_uploadedFiles.length}개)',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(8),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _uploadedFiles.length,
+              itemBuilder: (context, index) {
+                final file = _uploadedFiles[index];
+                return ListTile(
+                  leading: Icon(
+                    path.extension(file.path).toLowerCase() == '.svg'
+                        ? Icons.code
+                        : Icons.image,
+                  ),
+                  title: Text(path.basename(file.path)),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      setState(() {
+                        _uploadedFiles.removeAt(index);
+                      });
+                    },
+                  ),
+                );
+              },
+            ),
           ),
-          child: ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _uploadedFiles.length,
-            itemBuilder: (context, index) {
-              final file = _uploadedFiles[index];
-              return ListTile(
-                leading: Icon(
-                  path.extension(file.path).toLowerCase() == '.svg'
-                      ? Icons.code
-                      : Icons.image,
-                ),
-                title: Text(path.basename(file.path)),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () {
-                    setState(() {
-                      _uploadedFiles.removeAt(index);
-                    });
-                  },
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

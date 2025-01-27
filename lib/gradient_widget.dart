@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:image/image.dart' as img;
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:color_changer/widgets/styled_container.dart';
 
 class GradientWidget extends StatefulWidget {
   const GradientWidget({super.key});
@@ -49,7 +50,8 @@ class _GradientWidgetState extends State<GradientWidget> {
         title: const Text('배경 그라데이션 변경'),
       ),
       body: SingleChildScrollView(
-        child: Padding(
+        child: Container(
+          width: MediaQuery.of(context).size.width,
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -62,7 +64,7 @@ class _GradientWidgetState extends State<GradientWidget> {
                 ),
               ),
               const SizedBox(height: 24),
-              _buildImageUpload(),
+              _buildDropZone(),
               if (_uploadedImage != null) ...[
                 const SizedBox(height: 32),
                 _buildImageDisplay(),
@@ -78,45 +80,35 @@ class _GradientWidgetState extends State<GradientWidget> {
     );
   }
 
-  Widget _buildImageUpload() {
-    return DropTarget(
-      onDragDone: (detail) async {
-        final file = File(detail.files.first.path);
-        if (file.path.toLowerCase().endsWith('.svg')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('SVG 파일은 지원하지 않는 형식입니다.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
-        setState(() {
-          _uploadedImage = file;
-        });
-        await _loadImage();
-      },
-      onDragEntered: (detail) {
-        setState(() {
-          _dragging = true;
-        });
-      },
-      onDragExited: (detail) {
-        setState(() {
-          _dragging = false;
-        });
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: _dragging ? Colors.blue.shade50 : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.grey.shade300,
-            width: 2,
-          ),
-        ),
+  Widget _buildDropZone() {
+    return StyledContainer(
+      child: DropTarget(
+        onDragDone: (detail) async {
+          final file = File(detail.files.first.path);
+          if (file.path.toLowerCase().endsWith('.svg')) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('SVG 파일은 지원하지 않는 형식입니다.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+          setState(() {
+            _uploadedImage = file;
+          });
+          await _loadImage();
+        },
+        onDragEntered: (detail) {
+          setState(() {
+            _dragging = true;
+          });
+        },
+        onDragExited: (detail) {
+          setState(() {
+            _dragging = false;
+          });
+        },
         child: Column(
           children: [
             const Icon(
@@ -178,118 +170,120 @@ class _GradientWidgetState extends State<GradientWidget> {
   }
 
   Widget _buildGradientEditor() {
-    return Column(
-      children: [
-        const Text(
-          '그라데이션 설정',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
+    return StyledContainer(
+      child: Column(
+        children: [
+          const Text(
+            '그라데이션 설정',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Column(
-              children: [
-                const Text('시작 색상'),
-                ColorItem(
-                  color: startColor,
-                  onColorSelected: (newColor) {
-                    setState(() {
-                      startColor = newColor;
-                      _applyGradient();
-                    });
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(width: 32),
-            Column(
-              children: [
-                const Text('종료 색상'),
-                ColorItem(
-                  color: endColor,
-                  onColorSelected: (newColor) {
-                    setState(() {
-                      endColor = newColor;
-                      _applyGradient();
-                    });
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '그라데이션 중간점 조절',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Text('시작색'),
-                Expanded(
-                  child: Slider(
-                    value: _axisPosition,
-                    onChanged: (value) {
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Column(
+                children: [
+                  const Text('시작 색상'),
+                  ColorItem(
+                    color: startColor,
+                    onColorSelected: (newColor) {
                       setState(() {
-                        _axisPosition = value;
+                        startColor = newColor;
+                        _applyGradient();
                       });
-                      _applyGradient();
                     },
-                    min: 0.0,
-                    max: 1.0,
-                    divisions: 100,
-                    label: '${(_axisPosition * 100).round()}%',
                   ),
+                ],
+              ),
+              const SizedBox(width: 32),
+              Column(
+                children: [
+                  const Text('종료 색상'),
+                  ColorItem(
+                    color: endColor,
+                    onColorSelected: (newColor) {
+                      setState(() {
+                        endColor = newColor;
+                        _applyGradient();
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '그라데이션 중간점 조절',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
-                const Text('끝색'),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(
-              value: 'vertical',
-              label: Text('세로'),
-              icon: Icon(Icons.arrow_downward),
-            ),
-            ButtonSegment(
-              value: 'horizontal',
-              label: Text('가로'),
-              icon: Icon(Icons.arrow_forward),
-            ),
-            ButtonSegment(
-              value: 'diagonal_down',
-              label: Text('대각선 ↘'),
-              icon: Icon(Icons.trending_down),
-            ),
-            ButtonSegment(
-              value: 'diagonal_up',
-              label: Text('대각선 ↗'),
-              icon: Icon(Icons.trending_up),
-            ),
-          ],
-          selected: {gradientDirection},
-          onSelectionChanged: (Set<String> newSelection) {
-            setState(() {
-              gradientDirection = newSelection.first;
-              _applyGradient();
-            });
-          },
-        ),
-      ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Text('시작색'),
+                  Expanded(
+                    child: Slider(
+                      value: _axisPosition,
+                      onChanged: (value) {
+                        setState(() {
+                          _axisPosition = value;
+                        });
+                        _applyGradient();
+                      },
+                      min: 0.0,
+                      max: 1.0,
+                      divisions: 100,
+                      label: '${(_axisPosition * 100).round()}%',
+                    ),
+                  ),
+                  const Text('끝색'),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(
+                value: 'vertical',
+                label: Text('세로'),
+                icon: Icon(Icons.arrow_downward),
+              ),
+              ButtonSegment(
+                value: 'horizontal',
+                label: Text('가로'),
+                icon: Icon(Icons.arrow_forward),
+              ),
+              ButtonSegment(
+                value: 'diagonal_down',
+                label: Text('대각선 ↘'),
+                icon: Icon(Icons.trending_down),
+              ),
+              ButtonSegment(
+                value: 'diagonal_up',
+                label: Text('대각선 ↗'),
+                icon: Icon(Icons.trending_up),
+              ),
+            ],
+            selected: {gradientDirection},
+            onSelectionChanged: (Set<String> newSelection) {
+              setState(() {
+                gradientDirection = newSelection.first;
+                _applyGradient();
+              });
+            },
+          ),
+        ],
+      ),
     );
   }
 

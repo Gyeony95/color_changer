@@ -11,6 +11,7 @@ import 'package:palette_generator/palette_generator.dart';
 import 'package:image/image.dart' as img;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:xml/xml.dart';
+import 'package:color_changer/widgets/styled_container.dart';
 
 class ImageUploadWidget extends StatefulWidget {
   const ImageUploadWidget({super.key});
@@ -44,6 +45,7 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
       body: SingleChildScrollView(
         child: Container(
           padding: const EdgeInsets.all(24.0),
+          width: MediaQuery.of(context).size.width,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -93,28 +95,15 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
   }
 
   Widget _buildDropTarget() {
-    return DropTarget(
-      onDragEntered: (details) => setState(() => _dragging = true),
-      onDragExited: (details) => setState(() => _dragging = false),
-      onDragDone: (details) {
-        if (details.files.isNotEmpty) {
-          _onImageDropped(details.files.first.path);
-        }
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: _dragging
-                ? Theme.of(context).primaryColor
-                : Colors.grey.shade300,
-            width: 2,
-            // style: BorderStyle.dashed,
-          ),
-        ),
+    return StyledContainer(
+      child: DropTarget(
+        onDragEntered: (details) => setState(() => _dragging = true),
+        onDragExited: (details) => setState(() => _dragging = false),
+        onDragDone: (details) {
+          if (details.files.isNotEmpty) {
+            _onImageDropped(details.files.first.path);
+          }
+        },
         child: Column(
           children: [
             Icon(
@@ -125,23 +114,12 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
             const SizedBox(height: 16),
             Text(
               '이미지를 여기에 드래그하거나',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 16,
-              ),
+              style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 8),
             ElevatedButton(
               onPressed: _pickImage,
               child: const Text('파일 선택하기'),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '지원 형식: PNG, JPG, JPEG (최대 5MB)',
-              style: TextStyle(
-                color: Colors.grey.shade500,
-                fontSize: 14,
-              ),
             ),
           ],
         ),
@@ -388,7 +366,6 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
       await DownloadUtil.downloadImage(_modifiedImage!, context);
     }
   }
-
 
   void _resetImage() {
     setState(() {
