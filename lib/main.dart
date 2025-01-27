@@ -238,7 +238,7 @@ class MyHomePage extends StatelessWidget {
       bottomNavigationBar: Container(
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: const Text(
-          '© 2024 Color Changer. All rights reserved.',
+          '© 2025 Color Changer.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,

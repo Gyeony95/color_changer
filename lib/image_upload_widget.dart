@@ -99,9 +99,9 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
       child: DropTarget(
         onDragEntered: (details) => setState(() => _dragging = true),
         onDragExited: (details) => setState(() => _dragging = false),
-        onDragDone: (details) {
+        onDragDone: (details) async {
           if (details.files.isNotEmpty) {
-            _onImageDropped(details.files.first.path);
+            await _onImageDropped(details.files.first.path);
           }
         },
         child: Column(
@@ -222,15 +222,26 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
   }
 
   Future<void> _onImageDropped(String path) async {
+    final file = File(path);
+    final isSvg = path.endsWith('.svg');
+
     setState(() {
-      _uploadedImage = File(path);
-      _isSvg = path.endsWith('.svg');
+      _uploadedImage = file;
+      _isSvg = isSvg;
+      // SVG가 아닌 경우 즉시 이미지 표시
+      if (!_isSvg) {
+        final bytes = file.readAsBytesSync();
+        _originalImage = img.decodeImage(bytes);
+        _modifiedImage = _originalImage?.clone();
+        _backupImage = _originalImage?.clone();
+      }
     });
+
+    // 색상 추출은 비동기로 처리
     if (_isSvg) {
       await _extractColorsFromSvg();
     } else {
       await _extractColors();
-      _backupImage = _originalImage!.clone();
     }
   }
 
@@ -264,18 +275,16 @@ class _ImageUploadWidgetState extends State<ImageUploadWidget> {
 
   Future<void> _extractColors() async {
     if (_uploadedImage == null) return;
+
     final paletteGenerator = await PaletteGenerator.fromImageProvider(
       FileImage(_uploadedImage!),
       size: const Size(200, 200),
       maximumColorCount: 10,
     );
+
     setState(() {
       _colors = paletteGenerator.colors.toList();
     });
-
-    final bytes = await _uploadedImage!.readAsBytes();
-    _originalImage = img.decodeImage(Uint8List.fromList(bytes));
-    _modifiedImage = _originalImage;
   }
 
   void _changeColor(Color targetColor, Color newColor) {
