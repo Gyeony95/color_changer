@@ -1,0 +1,12 @@
+ROOT := $(shell git rev-parse --show-toplevel)
+FLUTTER := $(shell which flutter)
+FLUUTER_BIN_DIR := $(shell dirname $(FLUTTER))
+FLUTTER_DIR := $(FLUTTER_BIN_DIR:/bin=)
+DART := $(FLUTTER_BIN_DIR)/cache/dart-sdk/bin/dart
+
+
+bi: buildInstaller
+
+buildInstaller:
+	@echo "Make DMG"
+	@${FLUTTER} build macos --release && cd installer && appdmg dmg_json.json ~/Desktop/color_changer.dmg
